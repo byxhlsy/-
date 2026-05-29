@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>校园答题抽题 · 简单/困难</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(255,255,255,0.95);
+      border-radius: 28px;
+      padding: 30px 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    h1 { font-size: 26px; color: #4a3f7a; margin-bottom: 6px; }
+    .sub { font-size: 14px; color: #888; margin-bottom: 20px; }
+    .btn-group { display: flex; gap: 10px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
+    .diff-btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 14px 10px;
+      border: 2px solid #d0c4f0;
+      border-radius: 16px;
+      background: white;
+      font-size: 18px;
+      font-weight: bold;
+      color: #4a3f7a;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .diff-btn.active {
+      background: #7c5ce7;
+      color: white;
+      border-color: #7c5ce7;
+      box-shadow: 0 4px 12px rgba(124,92,231,0.3);
+    }
+    .draw-area { margin: 20px 0; }
+    .draw-box {
+      background: #f3e8ff;
+      border: 2px dashed #b49bde;
+      border-radius: 20px;
+      padding: 25px 15px;
+      margin: 20px 0;
+      min-height: 100px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .draw-box .icon { font-size: 48px; margin-bottom: 10px; }
+    .draw-box .status-text { font-size: 16px; color: #5a4b8a; }
+    .btn {
+      background: #7c5ce7;
+      color: white;
+      border: none;
+      font-size: 18px;
+      padding: 14px 30px;
+      border-radius: 50px;
+      width: 100%;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(124,92,231,0.4);
+      transition: transform 0.2s;
+      margin-top: 10px;
+    }
+    .btn:active { transform: scale(0.96); background: #6746d1; }
+    .btn:disabled { background: #bbb; box-shadow: none; cursor: not-allowed; }
+    .btn-secondary { background: #aaa; margin-top: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .quiz-area { text-align: left; margin-top: 25px; display: none; }
+    .quiz-title { font-size: 18px; font-weight: bold; color: #4a3f7a; margin-bottom: 15px; }
+    .question-block {
+      background: #f9f7ff;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .question-text { font-weight: 600; margin-bottom: 12px; color: #333; }
+    .options label {
+      display: block;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      background: white;
+      border: 1.5px solid #e0d7f5;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .options label:hover { background: #ede4ff; }
+    .options input[type="radio"] { margin-right: 8px; transform: scale(1.2); }
+    .result-area { display: none; margin-top: 20px; }
+    .score {
+      font-size: 42px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .footer-note { margin-top: 20px; font-size: 13px; color: #aaa; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎲 AI知识抽题</h1>
+  <div class="sub">选择题 · 判断题</div>
+
+  <!-- 难度选择 -->
+  <div class="btn-group" id="diffSelect">
+    <button class="diff-btn active" data-diff="easy" onclick="selectDiff('easy', this)">😊 简单</button>
+    <button class="diff-btn" data-diff="hard" onclick="selectDiff('hard', this)">🔥 困难</button>
+  </div>
+
+  <!-- 抽题区域 -->
+  <div class="draw-area" id="drawArea">
+    <div class="draw-box" id="drawBox">
+      <div class="icon">📦</div>
+      <div class="status-text" id="drawStatus">点击按钮抽一组题</div>
+    </div>
+    <button class="btn" id="drawBtn" onclick="startDraw()">✨ 抽取题组 ✨</button>
+  </div>
+
+  <!-- 答题区域 -->
+  <div class="quiz-area" id="quizArea">
+    <div class="quiz-title" id="paperTitle"></div>
+    <div id="questionsContainer"></div>
+    <button class="btn" onclick="submitQuiz()">📩 提交作答</button>
+    <button class="btn btn-secondary" onclick="resetToDraw()">↩ 重新抽题</button>
+  </div>
+
+  <!-- 结果区域 -->
+  <div class="result-area" id="resultArea">
+    <div style="font-size:18px;">你的得分</div>
+    <div class="score" id="scoreDisplay">0</div>
+    <div style="font-size:14px; color:#666;" id="scoreMsg"></div>
+    <button class="btn" style="margin-top:20px;" onclick="resetToDraw()">🔄 再来一局</button>
+  </div>
+  <div class="footer-note">📱 扫码参与 · 每题10题</div>
+</div>
+
+<script>
+  // ==================== 全部题单数据 ====================
+  const paperPool = [
+    // ---------- 简单题组（共10组） ----------
+    { id: 1, difficulty: 'easy', name: '简单组1', questions: [
+      { question: '人工智能是指：', options: ['让机器具有智能的技术', '制造机器人的技术', '设计智能手机的技术', '人类智慧的模拟技术'], answer: 0 },
+      { question: '机器学习是一种让机器能够：', options: ['理解人类的情感', '从数据中学习并改进的技术', '制造更多的机器', '判断天气的技术'], answer: 1 },
+      { question: '计算机视觉主要任务不包含：', options: ['人脸识别', '语义分割', '目标检测', '自动程序设计'], answer: 3 },
+      { question: '自动识别系统属于人工智能哪个应用领域：', options: ['机器学习', '人类感官模拟', '专家系统', '自然语言处理'], answer: 1 },
+      { question: '以下哪个不是机器人的应用领域？', options: ['制造业', '医疗保健', '传统手工艺制作', '宇航航天'], answer: 2 },
+      { question: '一些聋哑人为了能方便与人交流，利用打手势来表达自己的想法，这是智能的：', options: ['感知能力', '学习能力', '思维能力', '行为能力'], answer: 3 },
+      { question: '以下哪个不是人工智能的子领域？', options: ['机器学习', '计算机视觉', '电子游戏', '自然语言处理'], answer: 2 },
+      { question: '人工智能的发展已经达到了强人工智能阶段，能够像人类一样具备自我意识和情感。', options: ['正确','错误'], answer: 1 },
+      { question: '强化学习是机器学习的一种类型，它通过奖励和惩罚来训练智能体以达到最优行为策略。', options: ['正确','错误'], answer: 0 },
+      { question: '在人工智能中，深度学习的模型结构越复杂，其性能就一定越好。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 2, difficulty: 'easy', name: '简单组2', questions: [
+      { question: '人工智能系统的发展对社会的影响主要体现在：', options: ['只影响经济', '只影响科学研究', '经济、就业、医疗等多个方面', '不会对社会产生影响'], answer: 2 },
+      { question: '以下不属于完全信息博弈的游戏有：', options: ['井字棋', '黑白棋', '围棋', '桥牌'], answer: 3 },
+      { question: '以下哪个是自然语言处理的任务？', options: ['图像识别', '文本生成', '视频压缩', '音频播放'], answer: 1 },
+      { question: '如果深度卷积网络层数过深，不会导致什么问题：', options: ['过拟合', '梯度消失', '欠拟合', '计算成本增加'], answer: 2 },
+      { question: '监督学习是一种机器学习类型，系统如何学习？', options: ['从标记好的数据中学习', '从未标记的数据中学习', '通过观察人类行为学习', '通过模拟环境学习'], answer: 0 },
+      { question: '以下哪个不是人工智能的子领域？', options: ['机器学习', '计算机视觉', '量子力学', '自然语言处理'], answer: 2 },
+      { question: '强化学习中，智能体学习过程的关键依据是：', options: ['环境给予的奖励信号', '训练数据的标签', '预先设定的固定规则', '输入的内容'], answer: 0 },
+      { question: '在设计卷积神经网络时，开始时网络的深度尽可能深一些，当这个网络的性能还不错时，再考虑减少网络的层次，提升准确度。', options: ['正确','错误'], answer: 1 },
+      { question: '自然语言处理中的词嵌入技术（如 Word2Vec）能够完全理解单词的语义含义。', options: ['正确','错误'], answer: 1 },
+      { question: '人工智能伦理问题的核心是确保人工智能技术的发展不会对人类社会造成负面影响。', options: ['正确','错误'], answer: 0 }
+    ]},
+    { id: 3, difficulty: 'easy', name: '简单组3', questions: [
+      { question: 'AI的哪个领域专注于让机器阅读和理解人类语言？', options: ['计算机视觉', '机器学习', '自然语言处理', '自动规划'], answer: 2 },
+      { question: '人工智能（AI）是指机器模拟的什么能力？', options: ['人类智能', '动物迁徙', '植物生长', '星体运动'], answer: 0 },
+      { question: '在自然语言处理里，把文字变成数字的操作叫？', options: ['文字搬家', '文本向量化', '数字变文字', '文数转换'], answer: 1 },
+      { question: '人工智能研究最重要最广泛的两大领域是：', options: ['专家系统、自动规划', '专家系统、机器学习', '机器学习、自动规划', '机器学习、自然语言理解'], answer: 1 },
+      { question: '图像识别任务中常用的模型是？', options: ['能处理图像特征的模型', '能播放音乐的模型', '能计算数学题的模型', '能处理音频的模型'], answer: 0 },
+      { question: '人工智能算法要处理大量数据，这些数据的特点不包括：', options: ['数据量小', '类型多样', '维度高', '复杂度高'], answer: 0 },
+      { question: '在人工智能发展历程中，图灵测试的目的是：', options: ['测试计算机运算速度', '判断机器是否具有智能', '评估算法准确性', '提高算法精度'], answer: 1 },
+      { question: '人工智能系统在进行图像识别时，不需要人类的标注数据。', options: ['正确','错误'], answer: 1 },
+      { question: '人工智能的可解释性是指能够清楚地解释人工智能系统是如何做出决策的。', options: ['正确','错误'], answer: 0 },
+      { question: '在人工智能中，模型的泛化能力是指模型在训练数据上的表现能力。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 4, difficulty: 'easy', name: '简单组4', questions: [
+      { question: '监督学习依赖的核心数据特征是？', options: ['带有明确标签的数据', '完全无标签的数据', '随机生成的数据', '用户实时反馈数据'], answer: 0 },
+      { question: '以下哪种方法直接用于解决模型过拟合？', options: ['正则化技术（如L1/L2）', '增加训练数据量', '缩短模型训练时间', '更换高性能GPU'], answer: 0 },
+      { question: 'ChatGPT由哪个公司发布？', options: ['OpenAI', 'Microsoft', 'Intel', 'DeepSeek'], answer: 0 },
+      { question: '自然语言理解不是要实现的目标是：', options: ['理解别人讲的话', '对自然语言信息进行分析概括', '欣赏音乐', '机器翻译'], answer: 2 },
+      { question: '监督学习与无监督学习最大区别是：', options: ['先验知识', '学习算法', '学习方法', '有无标签'], answer: 3 },
+      { question: 'AI的全称是：', options: ['Artificial Intelligence', 'Advanced Information', 'Automated Intelligence', 'Advanced Intelligence'], answer: 0 },
+      { question: '人工智能中，将文字转为数字向量的技术是：', options: ['词向量技术', '图像识别技术', '语音合成技术'], answer: 0 },
+      { question: '在人工智能中，数据增强是一种通过增加数据量来提升模型性能的技术。', options: ['正确','错误'], answer: 0 },
+      { question: '在人工智能中，模型的过拟合是指模型在训练数据上表现很好，但在测试数据上表现很差。', options: ['正确','错误'], answer: 0 },
+      { question: '卷积神经网络的层次结构依次是由输入层、卷积层、激活层、池化层和全连接层组成。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 5, difficulty: 'easy', name: '简单组5', questions: [
+      { question: '智能语音助手主要技术是：', options: ['语音识别和自然语言处理', '图像识别和语音合成', '机器学习和数据挖掘'], answer: 0 },
+      { question: '模拟人类大脑神经网络处理数据的是：', options: ['人工神经网络', '支持向量机', '贝叶斯网络'], answer: 0 },
+      { question: 'AI模型训练中衡量预测与真实差异的是：', options: ['损失函数', '激活函数', '目标函数'], answer: 0 },
+      { question: '卷积神经网络在图像识别中的主要作用是：', options: ['提取图像特征', '生成图像', '对图像进行分类'], answer: 0 },
+      { question: '人工智能数据预处理不包括：', options: ['数据可视化', '数据清洗', '特征工程'], answer: 0 },
+      { question: '属于AI在交通领域应用的是：', options: ['自动驾驶', '交通信号灯手工控制', '道路建设规划'], answer: 0 },
+      { question: 'NLP中把文本拆分成单词或词组叫：', options: ['分词', '词性标注', '命名实体识别'], answer: 0 },
+      { question: '从数学的角度，降维可以分为线性降维和非线性降维。', options: ['正确','错误'], answer: 0 },
+      { question: '在人工智能中，模型的参数越多，其性能就一定越好。', options: ['正确','错误'], answer: 1 },
+      { question: '人工智能在体育领域的应用仅限于运动分析和训练优化。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 6, difficulty: 'easy', name: '简单组6', questions: [
+      { question: '机器人理解环境并决策主要技术来自：', options: ['人工智能算法', '机械设计原理', '电路设计知识'], answer: 0 },
+      { question: '关于AI与人类智能关系正确的是：', options: ['AI完全等同于人类智能', 'AI是对人类智能的模拟和扩展', 'AI和人类智能无关'], answer: 1 },
+      { question: '用于聚类分析的常用算法是：', options: ['K近邻算法', 'K均值算法', '决策树算法'], answer: 1 },
+      { question: '不属于AI在教育领域应用的是：', options: ['个性化学习辅导', '批改作文创意打分', '学校建筑设计'], answer: 2 },
+      { question: '开发AI应用选择算法依据：', options: ['数据特点和任务需求', '算法知名度', '开发人员喜好'], answer: 0 },
+      { question: 'AI训练数据来源不包括：', options: ['真实采集的数据', '公开数据集', '凭空想象的数据'], answer: 2 },
+      { question: '生成对抗网络（GAN）描述正确的是：', options: ['由生成器和判别器组成', '只用于图像生成', '训练容易稳定'], answer: 0 },
+      { question: '图灵测试是衡量机器智能的一个标准，由辛顿提出。', options: ['正确','错误'], answer: 1 },
+      { question: '被称为 “神经网络之父” 和 “人工智能教父” 的是辛顿。', options: ['正确','错误'], answer: 0 },
+      { question: '自然语言处理是一种让机器能够理解和处理人类语言的技术。', options: ['正确','错误'], answer: 0 }
+    ]},
+    { id: 7, difficulty: 'easy', name: '简单组7', questions: [
+      { question: '深度学习基于什么结构？', options: ['神经网络', '链表', '堆栈'], answer: 0 },
+      { question: 'AI中的“智能”体现在：', options: ['像人类一样思考和行动', '存储数据', '简单逻辑判断'], answer: 0 },
+      { question: '强化学习中的“奖励”用于：', options: ['引导智能体正确行为', '惩罚错误行为', '没有作用'], answer: 0 },
+      { question: '词向量技术主要作用是：', options: ['单词转为向量表示', '语法分析', '统计词频'], answer: 0 },
+      { question: 'CNN在图像处理优势：', options: ['自动提取图像特征', '处理黑白图像', '处理速度快'], answer: 0 },
+      { question: '不属于聚类算法的是：', options: ['K均值', '决策树', '层次聚类'], answer: 1 },
+      { question: 'AI伦理关注：', options: ['社会和人类影响', '技术实现细节', '编程语言'], answer: 0 },
+      { question: '深度学习是一种不需要大量数据来进行学习的机器学习技术。', options: ['正确','错误'], answer: 1 },
+      { question: '所有机器学习算法都需要人类的干预来进行学习。', options: ['正确','错误'], answer: 1 },
+      { question: '无监督学习的目标是对数据进行分类和预测。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 8, difficulty: 'easy', name: '简单组8', questions: [
+      { question: 'AI对制造业影响：', options: ['提高效率和质量', '减少技术工人', '回到手工生产'], answer: 0 },
+      { question: '医疗AI辅助诊断：', options: ['帮助医生准确诊断', '完全取代医生', '增加成本'], answer: 0 },
+      { question: 'AI对物流影响不包括：', options: ['路径优化', '增加人工搬运', '仓储效率提升'], answer: 1 },
+      { question: 'AI娱乐应用：', options: ['个性化推荐', '增加产品种类', '降低体验'], answer: 0 },
+      { question: '关于AI正确说法：', options: ['会完全超越人类智能', '在某些方面模拟人类智能', '无实际价值'], answer: 1 },
+      { question: '过拟合是指：', options: ['训练好、测试差', '训练测试都好', '训练测试都差'], answer: 0 },
+      { question: '数据预处理目的：', options: ['提高数据质量可用性', '增加复杂性', '减少数据量'], answer: 0 },
+      { question: '监督学习的标签一定人工标注。', options: ['正确','错误'], answer: 0 },
+      { question: 'K-means 属于监督学习。', options: ['正确','错误'], answer: 1 },
+      { question: '卷积层用于降维。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 9, difficulty: 'easy', name: '简单组9', questions: [
+      { question: 'AI在社交媒体应用：', options: ['推荐朋友、生成内容', '修剪花园', '烹饪比赛'], answer: 0 },
+      { question: '强人工智能指：', options: ['解决特定任务', '具备人类通用智能', '仅处理图像', '仅处理文本'], answer: 1 },
+      { question: '弱人工智能特点：', options: ['通用智能', '专用、单一任务', '有自我意识', '情感丰富'], answer: 1 },
+      { question: 'AI诞生年份：', options: ['1946', '1956', '1966', '1976'], answer: 1 },
+      { question: '达特茅斯会议核心成果：', options: ['发明计算机', '提出“人工智能”概念', '发明神经网络', '发明深度学习'], answer: 1 },
+      { question: '符号主义AI核心：', options: ['神经网络', '逻辑推理、符号运算', '行为模拟', '数据统计'], answer: 1 },
+      { question: '连接主义AI核心：', options: ['逻辑规则', '神经网络、仿生学', '行为反馈', '专家经验'], answer: 1 },
+      { question: 'GAN 生成器负责判断真假。', options: ['正确','错误'], answer: 1 },
+      { question: '边缘 AI 部署在云端。', options: ['正确','错误'], answer: 1 },
+      { question: '联邦学习保护数据隐私。', options: ['正确','错误'], answer: 0 }
+    ]},
+    { id: 10, difficulty: 'easy', name: '简单组10', questions: [
+      { question: '分类问题输出：', options: ['连续数值', '离散类别', '概率', '向量'], answer: 1 },
+      { question: '逻辑回归属于：', options: ['回归', '分类', '聚类', '强化学习'], answer: 1 },
+      { question: '随机森林是：', options: ['单棵树', '多棵决策树集成', '神经网络', '聚类算法'], answer: 1 },
+      { question: '欠拟合原因：', options: ['模型太复杂', '模型太简单', '数据太多', '训练太久'], answer: 1 },
+      { question: '训练集作用：', options: ['测试模型', '训练模型参数', '验证效果', '评估性能'], answer: 1 },
+      { question: '测试集作用：', options: ['训练模型', '评估泛化能力', '调整参数', '数据清洗'], answer: 1 },
+      { question: '验证集作用：', options: ['训练', '调参、防过拟合', '测试', '预处理'], answer: 1 },
+      { question: '零样本学习不需要训练数据。', options: ['正确','错误'], answer: 0 },
+      { question: '未来 AI 趋势之一是通用人工智能。', options: ['正确','错误'], answer: 0 },
+      { question: '模型参数越多，性能一定越好。', options: ['正确','错误'], answer: 1 }
+    ]},
+    // ---------- 困难题组（共6组） ----------
+    { id: 11, difficulty: 'hard', name: '困难组1', questions: [
+      { question: '世界上第一个被公认的编程语言，用于创建AI程序的是？', options: ['Python', 'Fortran', 'Lisp', 'C++'], answer: 2 },
+      { question: '下列哪项是人工智能的一个主要应用领域？', options: ['农业', '机器学习', '水文学', '地质勘探'], answer: 1 },
+      { question: '谁被称为“人工智能之父”？', options: ['约翰麦卡锡', '艾伦图灵', '伊隆马斯克', '斯蒂芬霍金'], answer: 0 },
+      { question: '在AI中，"NLP"通常代表什么？', options: ['New Logic Programming', 'Natural Language Processing', 'Neural Link Protocol', 'None of the Listed Preferences'], answer: 1 },
+      { question: '下列哪项技术不属于人工智能？', options: ['聊天机器人', '自动驾驶汽车', '量子计算', '语音识别'], answer: 2 },
+      { question: '人脸识别技术使用了AI的哪个分支？', options: ['机器学习', '计算机视觉', '数据挖掘', '自然语言处理'], answer: 1 },
+      { question: '以下哪个是一个著名的开源机器学习库？', options: ['Adobe AI', 'TensorFlow', 'Microsoft AI', 'Apple AI'], answer: 1 },
+      { question: '深度学习中，批量归一化（Batch Normalization）的主要作用是为了加快模型的收敛速度，同时也有一定的正则化效果。', options: ['正确','错误'], answer: 0 },
+      { question: '在强化学习中，策略梯度算法（Policy Gradient）直接对策略进行建模和优化，不需要价值函数。', options: ['正确','错误'], answer: 0 },
+      { question: '生成对抗网络（GAN）中的生成器和判别器在训练过程中是交替优化的，且判别器的训练目标始终是尽可能准确地区分真实样本和生成样本。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 12, difficulty: 'hard', name: '困难组2', questions: [
+      { question: '深度学习是基于什么结构的一类算法？', options: ['逻辑门', '人工神经网络', '决策树', '支持向量机'], answer: 1 },
+      { question: 'AlphaGo,一款著名的围棋程序, 是由哪家公司开发的？', options: ['Apple', 'Google DeepMind', 'Facebook', 'Amazon'], answer: 1 },
+      { question: '下列哪个项目是一个虚拟个人助手的例子？', options: ['Siri', 'Windows XP', 'Adobe Photoshop', 'Google Chrome'], answer: 0 },
+      { question: '机器人狗“Aibo”是哪家公司的产品？', options: ['Apple', 'Sony', 'Samsung', 'Microsoft'], answer: 1 },
+      { question: '在AI研究中，用来模拟人类大脑功能的技术是？', options: ['水冷计算', '线性回归', '人工神经网络', '量子计算'], answer: 2 },
+      { question: '“图灵测试”是用来测试什么的？', options: ['机器的物理能力', '机器展现人类智能的能力', '计算机的处理速度', '程序的错误率'], answer: 1 },
+      { question: '哪一年被视为人工智能诞生的年份？', options: ['1943', '1956', '1972', '1984'], answer: 1 },
+      { question: '卷积神经网络（CNN）中的池化层（Pooling Layer）主要作用是降低特征图的维度，同时保留主要特征，并且具有一定的平移不变性。', options: ['正确','错误'], answer: 0 },
+      { question: '迁移学习中，源域和目标域的数据分布必须完全相同，才能实现有效的知识迁移。', options: ['正确','错误'], answer: 1 },
+      { question: '在自然语言处理中，词嵌入（Word Embedding）技术将单词映射为低维稠密向量，能够捕捉单词之间的语义关系，且不同词嵌入方法得到的向量空间性质完全相同。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 13, difficulty: 'hard', name: '困难组3', questions: [
+      { question: 'AI的哪个领域专注于让机器阅读和理解人类语言？', options: ['计算机视觉', '机器学习', '自然语言处理', '自动规划'], answer: 2 },
+      { question: '以下哪种语言经常被用于AI研究和开发中？', options: ['HTML', 'Python', 'CSS', 'PHP'], answer: 1 },
+      { question: '谁发明了第一个自学习程序，该程序能够下棋？', options: ['阿兰图灵', '约翰冯诺依曼', '克劳德香农', '艾伦凯'], answer: 2 },
+      { question: '神经网络中“激活函数”的核心作用是？', options: ['引入非线性关系', '加快数据读写速度', '存储训练数据集', '减少内存占用'], answer: 0 },
+      { question: '无监督学习的典型任务是？', options: ['数据聚类（如客户分组）', '图像分类（如识别猫狗）', '房价预测', '语音转文字'], answer: 0 },
+      { question: '交叉验证（Cross-Validation）的主要目的是？', options: ['评估模型在未知数据上的表现', '增加训练数据总量', '提高CPU计算速度', '优化图形界面交互'], answer: 0 },
+      { question: '卷积神经网络（CNN）的核心特性是？', options: ['局部感知与参数共享', '处理时序数据', '生成随机噪声数据', '全连接层计算'], answer: 0 },
+      { question: '支持向量机（SVM）在处理非线性可分问题时，通过核函数将数据映射到高维空间，使得数据在高维空间中线性可分，核函数的选择对模型性能没有影响。', options: ['正确','错误'], answer: 1 },
+      { question: '深度学习中，Dropout 是一种防止过拟合的正则化方法，它在训练过程中随机丢弃一部分神经元，而在测试时所有神经元都参与计算。', options: ['正确','错误'], answer: 0 },
+      { question: '强化学习中的蒙特卡洛方法（Monte Carlo Method）和价值迭代方法（Value Iteration）都需要知道环境的完整模型。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 14, difficulty: 'hard', name: '困难组4', questions: [
+      { question: '贝叶斯分类器的理论基础是？', options: ['贝叶斯定理（概率推理）', '勾股定理（几何计算）', '牛顿定律（力学原理）', '热力学第二定律'], answer: 0 },
+      { question: '生成对抗网络（GAN）的核心组件是？', options: ['生成器与判别器', '编码器与解码器', '输入层与输出层', '训练集与测试集'], answer: 0 },
+      { question: '“Dropout”技术在训练神经网络时的作用是？', options: ['随机丢弃神经元防止过拟合', '加速数据预处理', '增加数据维度', '优化屏幕显示效果'], answer: 0 },
+      { question: '在机器学习中，用于将数据分为训练集和测试集的常见方法是？', options: ['聚类法', '排序法', '划分法（如70%训练集，30%测试集）', '降维法'], answer: 2 },
+      { question: '以下哪个是监督学习的典型任务？', options: ['对客户进行聚类', '预测股票价格走势', '对文档进行主题建模', '对图像进行降噪处理'], answer: 1 },
+      { question: '以下哪项是数据预处理的步骤？', options: ['训练模型参数', '缺失值填充', '部署到服务器', '设计用户界面'], answer: 1 },
+      { question: '“过拟合”意味着模型？', options: ['在训练集和测试集表现都差', '训练集表现好但测试集差', '训练集表现差但测试集好', '无法读取数据'], answer: 1 },
+      { question: '在神经网络中，激活函数的主要作用是引入非线性因素，使得神经网络能够拟合复杂的非线性函数，且所有激活函数都能保证梯度在反向传播过程中不消失。', options: ['正确','错误'], answer: 1 },
+      { question: '在模型训练过程中，提前停止是一种防止过拟合的有效方法。', options: ['正确','错误'], answer: 0 },
+      { question: '在图像风格迁移任务中，内容损失（Content Loss）和风格损失（Style Loss）的计算方式相同，都是基于特征图的差异。', options: ['正确','错误'], answer: 1 }
+    ]},
+    { id: 15, difficulty: 'hard', name: '困难组5', questions: [
+      { question: 'K近邻（KNN）算法属于哪种学习类型？', options: ['无监督学习', '监督学习', '半监督学习', '强化学习'], answer: 1 },
+      { question: '卷积神经网络（CNN）主要用于处理？', options: ['文本数据', '图像数据', '音频波形', '股票价格'], answer: 1 },
+      { question: '评估分类模型时，“准确率”的计算公式是？', options: ['正确预测数 / 总样本数', '真阳性数 / (真阳性+假阴性)', '真阳性数 / (真阳性+假阳性)', '(精确率+召回率) / 2'], answer: 0 },
+      { question: '机器人感知环境的核心技术不包括？', options: ['激光雷达（LiDAR）', '深度相机', '触觉传感器', '蓝牙信号强度'], answer: 3 },
+      { question: 'AI模型部署到边缘设备的挑战是？', options: ['计算资源有限', '数据传输速度过快', '存储空间过剩', '电源供应稳定'], answer: 0 },
+      { question: '以下哪项是AI研发中的“可解释性”目标？', options: ['让模型决策过程透明化', '增加模型参数数量', '提高训练数据多样性', '优化硬件散热效率'], answer: 0 },
+      { question: '以下哪种机器人常用于工业生产线上，执行重复、高精度的任务？', options: ['服务机器人', '医疗机器人', '工业机器人', '教育机器人'], answer: 2 },
+      { question: '广度优先搜索方法的原理是：从树的根节点开始，在树中一层一层的查找，当找到目标节点时，搜索结束。', options: ['正确','错误'], answer: 0 },
+      { question: '人工智能的一个重要分支是Pattern Recognition，中文名称是模式识别。它主要研究视觉与听觉的识别。', options: ['正确','错误'], answer: 0 },
+      { question: '人工智能研究的先驱者认为人的智能主要表现在人能学习知识与运用知识上，知识是智能的基础。于是学者们把专门的知识集、规则集与附加过程组成知识库，开发出许多专家系统（英文缩写为ES），在领域获得成功。', options: ['正确','错误'], answer: 0 }
+    ]},
+    { id: 16, difficulty: 'hard', name: '困难组6', questions: [
+      { question: 'AI研究中，深度学习模型的训练过程通常需要大量的计算资源。以下哪种硬件设备常被用于加速深度学习训练？', options: ['中央处理器（CPU）', '图形处理器（GPU）', '硬盘驱动器（HDD）', '随机存取存储器（RAM）'], answer: 1 },
+      { question: '在机器人研发中，为了让机器人更好地与人协作，需要考虑人机交互的设计。以下哪项不属于人机交互的方式？', options: ['语音交互', '手势交互', '眼神交流（通过摄像头模拟）', '机器人之间的无线通信'], answer: 3 },
+      { question: '以下哪项是机器人运动学的主要研究内容？', options: ['机器人关节角度与末端位置的关系', '机器人外壳材料强度', '机器人电池续航优化', '机器人语音交互设计'], answer: 0 },
+      { question: '在AI开发中，数据标注的主要作用是？', options: ['为监督学习提供标签', '压缩模型文件大小', '提高算法计算速度', '设计用户界面'], answer: 0 },
+      { question: '机器人通过传感器收集外界信息，以下属于视觉传感器的是？', options: ['激光雷达', '麦克风', '摄像头', '触觉传感器'], answer: 2 },
+      { question: '人工智能（AI）是指机器模拟的什么能力？', options: ['人类智能', '动物迁徙', '植物生长', '星体运动'], answer: 0 },
+      { question: '聊天机器人的一个著名例子是？', options: ['Eliza', 'Linux', 'Siri', 'Watson'], answer: 0 },
+      { question: '人工智能的发展完全依赖于硬件性能的提升。', options: ['正确','错误'], answer: 1 },
+      { question: '生成对抗网络（GAN）在训练过程中，生成器和判别器的损失函数是相互独立的，不会相互影响。', options: ['正确','错误'], answer: 1 },
+      { question: '线性回归就是一系列技术用于找出拟合一系列数据点的直线。', options: ['正确','错误'], answer: 0 }
+    ]}
+  ];
+
+  let currentDiff = 'easy';
+  let currentPaper = null;
+  let userAnswers = [];
+
+  function selectDiff(diff, btn) {
+    currentDiff = diff;
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    resetToDraw();
+  }
+
+  function resetToDraw() {
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('resultArea').style.display = 'none';
+    document.getElementById('drawArea').style.display = 'block';
+    document.getElementById('drawStatus').textContent = '点击按钮抽一组题';
+    const drawBtn = document.getElementById('drawBtn');
+    drawBtn.disabled = false;
+    drawBtn.textContent = '✨ 抽取题组 ✨';
+    drawBtn.onclick = startDraw;
+    currentPaper = null;
+    userAnswers = [];
+  }
+
+  function startDraw() {
+    const pool = paperPool.filter(p => p.difficulty === currentDiff);
+    if (pool.length === 0) {
+      alert('当前难度下没有题组，请重试。');
+      return;
+    }
+    const drawBtn = document.getElementById('drawBtn');
+    drawBtn.disabled = true;
+    drawBtn.textContent = '🎰 抽题中...';
+    const statusEl = document.getElementById('drawStatus');
+    statusEl.textContent = '正在随机挑选...';
+
+    const interval = setInterval(() => {
+      const rand = pool[Math.floor(Math.random() * pool.length)];
+      statusEl.textContent = '📋 ' + rand.name;
+    }, 100);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      const paper = pool[Math.floor(Math.random() * pool.length)];
+      currentPaper = paper;
+      userAnswers = new Array(paper.questions.length).fill(-1);
+      statusEl.textContent = '✅ 抽中：' + paper.name;
+      drawBtn.textContent = '✨ 开始答题';
+      drawBtn.disabled = false;
+      drawBtn.onclick = showQuiz;
+    }, 800);
+  }
+
+  function showQuiz() {
+    if (!currentPaper) return;
+    document.getElementById('drawArea').style.display = 'none';
+    document.getElementById('quizArea').style.display = 'block';
+    document.getElementById('resultArea').style.display = 'none';
+    document.getElementById('paperTitle').textContent = '📝 ' + currentPaper.name;
+    const container = document.getElementById('questionsContainer');
+    container.innerHTML = '';
+
+    currentPaper.questions.forEach((q, idx) => {
+      const qBlock = document.createElement('div');
+      qBlock.className = 'question-block';
+      const isJudge = q.options.length === 2 && q.options[0] === '正确' && q.options[1] === '错误';
+      let optionsHtml = '';
+      q.options.forEach((opt, optIdx) => {
+        const prefix = isJudge ? '' : (String.fromCharCode(65 + optIdx) + '. ');
+        optionsHtml += `
+          <label>
+            <input type="radio" name="q${idx}" value="${optIdx}" onclick="selectAnswer(${idx}, ${optIdx})">
+            ${prefix}${opt}
+          </label>
+        `;
+      });
+      qBlock.innerHTML = `
+        <div class="question-text">${idx+1}. ${q.question}</div>
+        <div class="options">${optionsHtml}</div>
+      `;
+      container.appendChild(qBlock);
+    });
+  }
+
+  function selectAnswer(qIdx, optIdx) {
+    userAnswers[qIdx] = optIdx;
+  }
+
+  function submitQuiz() {
+    if (!currentPaper) return;
+    const unanswered = userAnswers.findIndex(a => a === -1);
+    if (unanswered !== -1) {
+      alert(`请先完成第 ${unanswered+1} 题`);
+      return;
+    }
+    let score = 0;
+    currentPaper.questions.forEach((q, idx) => {
+      if (userAnswers[idx] === q.answer) score++;
+    });
+    const total = currentPaper.questions.length;
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('resultArea').style.display = 'block';
+    document.getElementById('scoreDisplay').textContent = `${score} / ${total}`;
+    const percent = score / total;
+    let msg = '';
+    if (percent === 1) msg = '🎉 全部正确，太厉害了！';
+    else if (percent >= 0.6) msg = '👍 不错，继续加油！';
+    else msg = '📖 再试一次吧~';
+    document.getElementById('scoreMsg').textContent = msg;
+  }
+</script>
+</body>
+</html>
